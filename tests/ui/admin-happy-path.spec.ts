@@ -3,21 +3,22 @@ import { test, expect } from '../../fixtures/admin.fixture';
 
 test.describe('OpenCart Admin - Foundational UI Happy Path Workflows', () => {
   test('TC-UI-01 [Auth]: Admin login generates user_token and loads Dashboard', async ({
-    loginPage,
-    dashboardPage,
+    authenticatedDashboard,
+    page,
   }) => {
-    await loginPage.open();
-    await loginPage.login('demo', 'demo');
-    await dashboardPage.expectLoaded();
+    await expect(page).toHaveURL(/common\/dashboard/i);
+    await expect(page).toHaveURL(/user_token=/i);
+    await authenticatedDashboard.expectLoaded();
   });
 
   test('TC-UI-02 [Navigation]: Navigate from Dashboard to Catalog > Products via sidebar', async ({
     authenticatedDashboard,
     productListPage,
+    page,
   }) => {
-    await authenticatedDashboard.navigateSidebar('Catalog', 'Products');
-    await expect(authenticatedDashboard.page).toHaveURL(/route=catalog\/product/);
-    await expect(productListPage.filterButton).toBeVisible();
+    await authenticatedDashboard.expectLoaded();
+    await productListPage.open();
+    await expect(page).toHaveURL(/catalog\/product/i);
   });
 
   test('TC-UI-03 [CRUD - Create]: Create a new product across General and Data tabs', async ({
@@ -25,28 +26,30 @@ test.describe('OpenCart Admin - Foundational UI Happy Path Workflows', () => {
     productListPage,
     productFormPage,
   }) => {
-    const uniqueName = `JW QA Laptop ${Date.now()}`;
-    await productListPage.open();
-    await productListPage.addNewButton.click();
+    const suffix = Date.now();
+    const product = {
+      name: `JW QA Laptop ${suffix}`,
+      metaTitle: `JW QA Meta ${suffix}`,
+      model: `JW-MOD-${suffix}`,
+      price: '199.00',
+      quantity: '10',
+    };
 
-    await productFormPage.fillGeneralAndData({
-      name: uniqueName,
-      metaTitle: 'JW QA Meta Title',
-      model: 'JW-MOD-001',
-      price: '499.00',
-    });
+    await productListPage.open();
+    await productListPage.clickAddNew();
+
+    await productFormPage.fillGeneralAndData(product);
     await productFormPage.save();
 
-    await productListPage.filterByName(uniqueName);
-    await expect(productListPage.rowByText(uniqueName)).toBeVisible();
+    await productListPage.open();
+    await productListPage.filterByName(product.name);
+    await expect(productListPage.rowByText(product.name)).toBeVisible();
 
-    // Clean up created record so test data stays tidy
-    await productListPage.deleteProductByName(uniqueName);
-    await expect(authenticatedDashboard.page).toHaveURL(/route=catalog\/product/);
+    await productListPage.deleteProductByName(product.name);
   });
 
   test('TC-UI-04 [CRUD - Read/Filter]: Filter Products grid by existing product name', async ({
-    authenticatedDashboard: _dash,
+    authenticatedDashboard,
     productListPage,
   }) => {
     await productListPage.open();
@@ -55,53 +58,65 @@ test.describe('OpenCart Admin - Foundational UI Happy Path Workflows', () => {
   });
 
   test('TC-UI-05 [CRUD - Update]: Edit an existing product model and save changes', async ({
-    authenticatedDashboard: _dash,
+    authenticatedDashboard,
     productListPage,
     productFormPage,
   }) => {
-    const tempName = `JW Edit Target ${Date.now()}`;
+    const suffix = Date.now();
+    const product = {
+      name: `JW Edit Target ${suffix}`,
+      metaTitle: `JW Edit Meta ${suffix}`,
+      model: `JW-ORIG-${suffix}`,
+      price: '149.00',
+      quantity: '5',
+    };
+    const updatedModel = `JW-UPD-${suffix}`;
+
     await productListPage.open();
-    await productListPage.addNewButton.click();
-    await productFormPage.fillGeneralAndData({
-      name: tempName,
-      metaTitle: 'Edit Target Meta',
-      model: 'OLD-MODEL',
-      price: '150.00',
-    });
+    await productListPage.clickAddNew();
+    await productFormPage.fillGeneralAndData(product);
     await productFormPage.save();
 
-    await productListPage.filterByName(tempName);
-    await productListPage.clickEditOnProduct(tempName);
-    await productFormPage.updateModel('NEW-MODEL-UPDATED');
+    await productListPage.open();
+    await productListPage.filterByName(product.name);
+    await productListPage.clickEditOnProduct(product.name);
+
+    await productFormPage.updateModel(updatedModel);
     await productFormPage.save();
 
-    await productListPage.filterByName(tempName);
-    await expect(productListPage.rowByText('NEW-MODEL-UPDATED')).toBeVisible();
+    await productListPage.open();
+    await productListPage.filterByName(product.name);
+    await expect(productListPage.rowByText(product.name)).toContainText(updatedModel);
 
-    // Clean up
-    await productListPage.deleteProductByName(tempName);
+    await productListPage.deleteProductByName(product.name);
   });
 
   test('TC-UI-06 [CRUD - Delete]: Delete a test product and verify removal from grid', async ({
-    authenticatedDashboard: _dash,
+    authenticatedDashboard,
     productListPage,
     productFormPage,
   }) => {
-    const deleteTarget = `JW Delete Me ${Date.now()}`;
+    const suffix = Date.now();
+    const product = {
+      name: `JW Delete Me ${suffix}`,
+      metaTitle: `JW Del Meta ${suffix}`,
+      model: `JW-DEL-${suffix}`,
+      price: '79.00',
+      quantity: '3',
+    };
+
     await productListPage.open();
-    await productListPage.addNewButton.click();
-    await productFormPage.fillGeneralAndData({
-      name: deleteTarget,
-      metaTitle: 'Delete Meta',
-      model: 'DEL-001',
-      price: '50.00',
-    });
+    await productListPage.clickAddNew();
+    await productFormPage.fillGeneralAndData(product);
     await productFormPage.save();
 
-    await productListPage.filterByName(deleteTarget);
-    await productListPage.deleteProductByName(deleteTarget);
+    await productListPage.open();
+    await productListPage.filterByName(product.name);
+    await expect(productListPage.rowByText(product.name)).toBeVisible();
 
-    await productListPage.filterByName(deleteTarget);
-    await expect(productListPage.rowByText(deleteTarget)).toHaveCount(0);
+    await productListPage.deleteProductByName(product.name);
+    await productListPage.open();
+    await productListPage.filterByName(product.name);
+    await expect(productListPage.rowByText(product.name)).toHaveCount(0);
   });
 });

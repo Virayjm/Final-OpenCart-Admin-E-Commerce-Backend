@@ -1,0 +1,23 @@
+[
+  {
+    "namePrefix": "JW DDT Monitor",
+    "metaTitlePrefix": "JW DDT Meta Monitor",
+    "modelPrefix": "JW-DDT-MON",
+    "price": "249.00",
+    "quantity": "15"
+  },
+  {
+    "namePrefix": "JW DDT Keyboard",
+    "metaTitlePrefix": "JW DDT Meta Keyboard",
+    "modelPrefix": "JW-DDT-KEY",
+    "price": "79.00",
+    "quantity": "30"
+  },
+  {
+    "namePrefix": "JW DDT Dock",
+    "metaTitlePrefix": "JW DDT Meta Dock",
+    "modelPrefix": "JW-DDT-DCK",
+    "price": "129.00",
+    "quantity": "20"
+  }
+]

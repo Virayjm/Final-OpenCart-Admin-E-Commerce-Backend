@@ -11,36 +11,62 @@ export class ProductListPage extends BasePage {
 
   constructor(page: Page) {
     super(page);
-    this.addNewButton = page.locator('a[data-bs-original-title="Add New"], a[title="Add New"], a[href*="catalog/product/add"], a[href*="catalog/product.form"]').first();
-    this.deleteButton = page.locator('button[formaction*="delete"], button[data-bs-original-title="Delete"], button[title="Delete"]').first();
-    this.filterNameInput = page.locator('#input-name');
-    this.filterButton = page.locator('#button-filter');
-    this.tableRows = page.locator('table tbody tr');
+    this.addNewButton = this.page
+      .locator(
+        '.page-header a.btn-primary, #content .btn-primary[href*="product"], a[data-bs-original-title="Add New"], a[title="Add New"], a[href*="catalog/product.form"], a[href*="catalog/product/add"]'
+      )
+      .first();
+    this.deleteButton = page
+      .locator(
+        'button[formaction*="delete"], button[data-bs-original-title="Delete"], button[title="Delete"], button.btn-danger'
+      )
+      .first();
+    this.filterNameInput = page
+      .locator(
+        '#input-filter-name, input[name="filter_name"], #input-name, .card:has-text("Filter") input[placeholder*="Product Name"]'
+      )
+      .filter({ visible: true })
+      .first();
+    this.filterButton = page
+      .locator('#button-filter, button[id*="filter"], button:has-text("Filter")')
+      .first();
+    this.tableRows = page.locator('form#form-product table tbody tr, table tbody tr');
   }
 
   async open(): Promise<void> {
-    await this.gotoRoute('catalog/product');
-    await expect(this.filterButton).toBeVisible();
+    await this.dismissSecurityModalIfVisible();
+    await this.navigateSidebar('Catalog', 'Products');
+    await expect(this.page).toHaveURL(/catalog\/product/i);
+    await expect(this.tableRows.or(this.filterButton).first()).toBeVisible();
   }
 
   async filterByName(name: string): Promise<void> {
+    await this.dismissSecurityModalIfVisible();
+
+    await expect(this.filterNameInput).toBeVisible();
     await this.filterNameInput.fill(name);
-    await Promise.all([
-      this.page.waitForResponse((res) =>
-        res.url().includes('catalog/product') && res.status() === 200
-      ),
-      this.filterButton.click(),
-    ]);
+
+    await expect(this.filterButton).toBeVisible();
+    await this.filterButton.click();
+
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => null);
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   rowByText(text: string): Locator {
-    return this.tableRows.filter({ hasText: text }).first();
+    return this.page
+      .locator('form#form-product table tbody tr, table tbody tr')
+      .filter({ hasText: text })
+      .first();
   }
 
   async clickEditOnProduct(productName: string): Promise<void> {
     const row = this.rowByText(productName);
     await expect(row).toBeVisible();
-    await row.locator('a[href*="edit"], a[href*="form"]').first().click();
+    const editLink = row.locator('a[href*="edit"], a[href*="form"], a.btn-primary').first();
+    await editLink.scrollIntoViewIfNeeded();
+    await editLink.click();
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   async deleteProductByName(productName: string): Promise<void> {
@@ -53,5 +79,12 @@ export class ProductListPage extends BasePage {
     });
     await this.deleteButton.click();
     await this.expectSuccessAlert();
+  }
+
+  async clickAddNew(): Promise<void> {
+    await this.dismissSecurityModalIfVisible();
+    await expect(this.addNewButton).toBeVisible();
+    await this.addNewButton.click();
+    await this.page.waitForLoadState('domcontentloaded');
   }
 }
