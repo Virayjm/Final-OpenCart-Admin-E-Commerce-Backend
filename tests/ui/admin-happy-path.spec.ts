@@ -98,7 +98,7 @@ test.describe('OpenCart Admin - Foundational UI Happy Path Workflows', () => {
   }) => {
     const suffix = Date.now();
     const product = {
-      name: `JW Delete Me ${suffix}`,
+      name: `JW Delete Me ${suffix}`    ,
       metaTitle: `JW Del Meta ${suffix}`,
       model: `JW-DEL-${suffix}`,
       price: '79.00',

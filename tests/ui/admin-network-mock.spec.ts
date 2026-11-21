@@ -22,7 +22,6 @@ test.describe('OpenCart Admin - Network Interception & Mocking (page.route)', ()
 
     let intercepted500 = false;
 
-    // Intercept product save/mutation requests and fulfill with 500 Internal Server Error
     await page.route('**/*catalog/product*', async (route) => {
       const method = route.request().method();
       if (method === 'POST' || method === 'PUT') {
@@ -42,21 +41,49 @@ test.describe('OpenCart Admin - Network Interception & Mocking (page.route)', ()
     await expect(productFormPage.saveButton).toBeVisible();
     await productFormPage.saveButton.click();
 
-    // Give the UI a moment to process the 500 response
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => null);
 
     // Confirm the page did not crash, white-screen, or freeze
     await expect(page.locator('body')).not.toBeEmpty();
     await expect(productFormPage.saveButton).toBeEnabled();
 
-    // If OpenCart renders a danger/alert/toast banner, verify it is visible;
-    // otherwise verify the 500 response was intercepted and the form remained intact
     const errorBanner = page.locator('.alert-danger, #alert .alert, .toast').first();
     const bannerVisible = await errorBanner.isVisible().catch(() => false);
     if (!bannerVisible) {
       expect(intercepted500).toBe(true);
       await expect(page.locator('#form-product, form').first()).toBeVisible();
     }
+
+    await page.unroute('**/*catalog/product*');
+  });
+
+  test('TC-NET-02: Simulate slow network response on catalog request and verify UI completes cleanly', async ({
+    authenticatedDashboard,
+    productListPage,
+    page,
+  }) => {
+    await authenticatedDashboard.expectLoaded();
+
+    let delayedRequests = 0;
+    const artificialDelayMs = 1500;
+
+    await page.route('**/*catalog/product*', async (route) => {
+      delayedRequests++;
+      await new Promise((resolve) => setTimeout(resolve, artificialDelayMs));
+      await route.continue();
+    });
+
+    const startTime = Date.now();
+    await productListPage.open();
+    await productListPage.dismissSecurityModalIfVisible();
+
+    const elapsedMs = Date.now() - startTime;
+    expect(delayedRequests).toBeGreaterThan(0);
+    expect(elapsedMs).toBeGreaterThanOrEqual(artificialDelayMs - 150);
+
+    // Verify grid/page still renders cleanly after delayed response
+    await expect(productListPage.tableRows.first()).toBeVisible();
+    await expect(page.locator('body')).not.toBeEmpty();
 
     await page.unroute('**/*catalog/product*');
   });
