@@ -1,3 +1,4 @@
+// Data-driven product creation and cleanup test suite powered by an external JSON payload.
 import { test, expect } from '../../fixtures/admin.fixture';
 import ddtProducts from '../../fixtures/test-data/products-ddt.json';
 
@@ -10,7 +11,12 @@ interface DdtProductRow {
 }
 
 test.describe('OpenCart Admin - Data-Driven Testing (JSON)', () => {
-  test('TC-DDT-01: Create and verify multiple products from external JSON dataset', async ({
+  /**
+   * TC-DDT-01 (extends BDD scenario TS-04 across multiple datasets): Iterates
+   * through `products-ddt.json` to create, verify, and clean up multiple
+   * products using a single parameterized test workflow.
+   */
+  test('TC-DDT-01 [TS-04]: Create and verify multiple products from external JSON dataset', async ({
     authenticatedDashboard,
     productListPage,
     productFormPage,
@@ -46,7 +52,6 @@ test.describe('OpenCart Admin - Data-Driven Testing (JSON)', () => {
       createdNames.push(product.name);
     }
 
-    // Clean up created DDT test products so the catalog stays tidy
     for (const productName of createdNames) {
       await productListPage.open();
       await productListPage.filterByName(productName);

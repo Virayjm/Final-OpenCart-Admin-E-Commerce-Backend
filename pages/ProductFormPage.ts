@@ -1,7 +1,10 @@
-// Add/Edit multi-tab product form (General, Data, etc.)
+// Multi-tab product creation and editing page object for OpenCart Admin (General, Data, Links, and SEO tabs).
 import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
 
+/**
+ * Defines the product field values submitted on the OpenCart Admin product form.
+ */
 export interface ProductPayload {
   name: string;
   metaTitle: string;
@@ -10,6 +13,10 @@ export interface ProductPayload {
   quantity?: string;
 }
 
+/**
+ * Models the Add/Edit Product form in OpenCart Admin, handling tab switching,
+ * required field entry, store assignment, SEO slug generation, and form submission.
+ */
 export class ProductFormPage extends BasePage {
   readonly dataPane: Locator;
   readonly generalTab: Locator;
@@ -25,6 +32,9 @@ export class ProductFormPage extends BasePage {
   readonly seoKeywordInput: Locator;
   readonly saveButton: Locator;
 
+  /**
+   * Initializes tab triggers, form inputs, and action locators for the product form.
+   */
   constructor(page: Page) {
     super(page);
 
@@ -59,7 +69,7 @@ export class ProductFormPage extends BasePage {
       .locator('input[name="product_store[]"][value="0"], #input-store-0')
       .first();
 
-    // Confirmed from call log: id="input-keyword-0-1", name="product_seo_url[0][1]"
+    // Confirmed in OpenCart 4.1.0.4: id="input-keyword-0-1", name="product_seo_url[0][1]"
     this.seoKeywordInput = page
       .locator('#input-keyword-0-1, input[name="product_seo_url[0][1]"]')
       .first();
@@ -71,6 +81,9 @@ export class ProductFormPage extends BasePage {
       .first();
   }
 
+  /**
+   * Activates the General tab after dismissing any visible security modal.
+   */
   async openGeneralTab(): Promise<void> {
     await this.dismissSecurityModalIfVisible();
     if ((await this.generalTab.count().catch(() => 0)) > 0) {
@@ -79,6 +92,9 @@ export class ProductFormPage extends BasePage {
     }
   }
 
+  /**
+   * Activates the Data tab and waits for the data tab pane to become visible.
+   */
   async openDataTab(): Promise<void> {
     await this.dismissSecurityModalIfVisible();
     if ((await this.dataTab.count().catch(() => 0)) > 0) {
@@ -90,6 +106,9 @@ export class ProductFormPage extends BasePage {
     }
   }
 
+  /**
+   * Opens the Links tab and ensures the default store checkbox is selected.
+   */
   async ensureDefaultStoreChecked(): Promise<void> {
     await this.dismissSecurityModalIfVisible();
     if ((await this.linksTab.count().catch(() => 0)) > 0) {
@@ -103,6 +122,10 @@ export class ProductFormPage extends BasePage {
     }
   }
 
+  /**
+   * Opens the SEO tab and populates the Keyword field with a unique hyphenated
+   * slug derived from the product name within OpenCart's 1-64 character limit.
+   */
   async fillSeoKeyword(productName: string): Promise<void> {
     await this.dismissSecurityModalIfVisible();
     if ((await this.seoTab.count().catch(() => 0)) > 0) {
@@ -125,6 +148,9 @@ export class ProductFormPage extends BasePage {
     await this.seoKeywordInput.fill(seoKeyword);
   }
 
+  /**
+   * Populates General, Data, Links, and SEO fields from the supplied product payload.
+   */
   async fillGeneralAndData(payload: ProductPayload): Promise<void> {
     await this.openGeneralTab();
 
@@ -151,12 +177,19 @@ export class ProductFormPage extends BasePage {
     await this.fillSeoKeyword(payload.name);
   }
 
+  /**
+   * Switches to the Data tab and updates the product model identifier.
+   */
   async updateModel(newModel: string): Promise<void> {
     await this.openDataTab();
     await expect(this.modelInput).toBeVisible();
     await this.modelInput.fill(newModel);
   }
 
+  /**
+   * Submits the product form, reports any alert or tab/field validation errors
+   * if saving fails, and verifies the success alert banner.
+   */
   async save(): Promise<void> {
     await this.dismissSecurityModalIfVisible();
     await expect(this.saveButton).toBeVisible();
@@ -210,5 +243,69 @@ export class ProductFormPage extends BasePage {
     }
 
     await this.expectSuccessAlert();
+  }
+  
+  /**
+   * Opens the Links tab, ensures the default store checkbox is selected, and
+   * populates the category autocomplete input when visible.
+   */
+  async assignStoreAndCategory(categoryName: string): Promise<void> {
+    await this.ensureDefaultStoreChecked();
+
+    const categoryInput = this.page
+      .locator('#input-category, input[name*="category" i][type="text"]')
+      .filter({ visible: true })
+      .first();
+
+    if (await categoryInput.isVisible().catch(() => false)) {
+      await categoryInput.click();
+      await categoryInput.fill(categoryName);
+    }
+  }
+
+  /**
+   * Opens the Image tab when present and attaches a file via a direct file
+   * input or opens the upload/file-manager modal trigger. Returns `false` if
+   * no upload control is exposed on the current build.
+   */
+  async uploadProductImage(filePath: string): Promise<boolean> {
+    const imageTab = this.page
+      .getByRole('tab', { name: /^Image$/i })
+      .or(this.page.locator('a[href="#tab-image"]'))
+      .first();
+
+    if (await imageTab.isVisible().catch(() => false)) {
+      await imageTab.click();
+    }
+
+    const fileInput = this.page.locator('input[type="file"]').first();
+    if ((await fileInput.count()) > 0) {
+      await fileInput.setInputFiles(filePath);
+      return true;
+    }
+
+    const editImageBtn = this.page
+      .locator('#tab-image button:has-text("Edit"), [role="tabpanel"] button:has-text("Edit")')
+      .filter({ visible: true })
+      .first();
+
+    if (await editImageBtn.isVisible().catch(() => false)) {
+      const fileChooserPromise = this.page.waitForEvent('filechooser', { timeout: 3000 }).catch(() => null);
+      await editImageBtn.click();
+
+      const fileChooser = await fileChooserPromise;
+      if (fileChooser) {
+        await fileChooser.setFiles(filePath);
+        return true;
+      }
+
+      const activeOverlay = this.page
+        .locator('.modal.show, [role="dialog"], .popover.show, input[type="file"]')
+        .first();
+      await expect(activeOverlay).toBeVisible({ timeout: 10000 });
+      return true;
+    }
+
+    return false;
   }
 }
