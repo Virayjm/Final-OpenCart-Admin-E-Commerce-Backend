@@ -3,18 +3,25 @@ import { adminConfig } from '../../config/env.config';
 
 const ADMIN_BASE = adminConfig.baseURL;
 
+/**
+ * Extracts the `user_token` query parameter from a URL or query string.
+ */
 function extractUserToken(input: string): string | null {
   try {
     const url = new URL(input, ADMIN_BASE);
     const paramToken = url.searchParams.get('user_token');
     if (paramToken) return paramToken;
   } catch {
-    // Not a full URL; fall back to regex match
+    // Input is a partial query or HTML fragment rather than a standalone URL
   }
   const match = input.match(/[?&]user_token=([a-zA-Z0-9_-]+)/);
   return match ? match[1] : null;
 }
 
+/**
+ * Attempts to authenticate with configured admin credentials and return a
+ * `user_token` when available in the current environment.
+ */
 async function tryAuthenticate(request: APIRequestContext): Promise<string | null> {
   const loginGet = await request.get(`${ADMIN_BASE}index.php?route=common/login`);
   if (loginGet.status() !== 200) {
@@ -48,7 +55,7 @@ async function tryAuthenticate(request: APIRequestContext): Promise<string | nul
         token = extractUserToken(json.redirect.replace(/&amp;/g, '&'));
       }
     } catch {
-      // Response is HTML rather than JSON
+      // Response body is HTML rather than JSON
     }
   }
 
@@ -62,7 +69,13 @@ async function tryAuthenticate(request: APIRequestContext): Promise<string | nul
   return token;
 }
 
+/**
+ * Expanded and negative backend API test suite covering missing-token route
+ * guards, unknown routes, query payload escaping, and customer endpoint access.
+ */
 test.describe('OpenCart Admin - Expanded & Negative Backend API Tests', () => {
+  // TC-API-05: Verifies that accessing a protected admin route without a `user_token`
+  // is blocked, redirected, or denied access.
   test('TC-API-05 [Auth Guard]: Protected admin route without user_token blocks or redirects', async ({
     request,
   }) => {
@@ -78,6 +91,8 @@ test.describe('OpenCart Admin - Expanded & Negative Backend API Tests', () => {
     }
   });
 
+  // TC-API-06: Verifies that a non-existent admin route does not trigger an
+  // unhandled HTTP 500 server error.
   test('TC-API-06 [Negative Route]: Non-existent admin route does not cause an unhandled 500 crash', async ({
     request,
   }) => {
@@ -95,6 +110,8 @@ test.describe('OpenCart Admin - Expanded & Negative Backend API Tests', () => {
     expect(body.length).toBeGreaterThan(0);
   });
 
+  // TC-API-07: Verifies that script-like query parameters are not reflected
+  // unescaped in the response body.
   test('TC-API-07 [Malicious / Special Payload]: Special & script-like query input is not reflected unescaped', async ({
     request,
   }) => {
@@ -111,6 +128,8 @@ test.describe('OpenCart Admin - Expanded & Negative Backend API Tests', () => {
     expect(body).not.toContain('<script>alert(1)</script>');
   });
 
+  // TC-API-08: Verifies that an authenticated request can retrieve the
+  // Customers admin route when a valid `user_token` is issued.
   test('TC-API-08 [Authenticated Endpoint]: Fetch Customers or User Groups endpoint with valid token', async ({
     request,
   }) => {
